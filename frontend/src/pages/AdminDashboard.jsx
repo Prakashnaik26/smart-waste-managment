@@ -12,7 +12,7 @@ import {
   AlertCircle, Users, Award, Sparkles, Loader2, User,
   Download, Plus, Search, Hammer, CheckSquare, Clock, Filter, Eye, X,
   MessageSquare, Send, Check, AlertTriangle, Camera, Upload, RefreshCw,
-  TrendingUp, Activity, Flame, ChevronRight, ArrowUpRight, ArrowRight, HardHat, CheckCircle2
+  TrendingUp, Activity, Flame, ChevronRight, ArrowUpRight, ArrowRight, HardHat, CheckCircle2, ShieldCheck
 } from "lucide-react";
 
 const CATEGORY_COLORS = {
@@ -51,6 +51,12 @@ export const AdminDashboard = () => {
   const [selectedReport, setSelectedReport] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [submittingAction, setSubmittingAction] = useState(false);
+
+  // Review Modal (Verify / Reject before confirming)
+  const [reviewReport, setReviewReport] = useState(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [reviewAction, setReviewAction] = useState(null); // "verify" | "reject"
 
   // Map center state for top hotspots click
   const [mapCenter, setMapCenter] = useState([12.9716, 77.5946]);
@@ -110,6 +116,56 @@ export const AdminDashboard = () => {
     } finally {
       setSubmittingAction(false);
     }
+  };
+
+  const handleRejectReport = async (reportId, reason) => {
+    setSubmittingAction(true);
+    try {
+      const res = await fetch(`${API_URL}/api/reports/${reportId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: "Rejected",
+          resolutionNote: reason || "Rejected by admin"
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reject report");
+
+      setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: "Rejected" } : r));
+      fetchData();
+    } catch (err) {
+      console.error("Reject error:", err);
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const openReviewModal = (report) => {
+    setReviewReport(report);
+    setRejectionReason("");
+    setReviewAction(null);
+    setIsReviewModalOpen(true);
+  };
+
+  const closeReviewModal = () => {
+    setIsReviewModalOpen(false);
+    setReviewReport(null);
+    setRejectionReason("");
+    setReviewAction(null);
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!reviewReport || !reviewAction) return;
+    if (reviewAction === "verify") {
+      await handleVerifyReport(reviewReport.id);
+    } else if (reviewAction === "reject") {
+      await handleRejectReport(reviewReport.id, rejectionReason);
+    }
+    closeReviewModal();
   };
 
   const handleStatusFilterClick = (st) => {
@@ -996,13 +1052,12 @@ export const AdminDashboard = () => {
                         </td>
                         <td className="py-3 text-slate-700">{report.reporterName || "Citizen"}</td>
                         <td className="py-3 text-right space-x-1">
-                          {!report.isVerified && (
+                          {!report.isVerified && report.status !== "Rejected" && (
                             <button
-                              onClick={() => handleVerifyReport(report.id)}
-                              disabled={submittingAction}
+                              onClick={() => openReviewModal(report)}
                               className="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[10px] rounded-lg cursor-pointer"
                             >
-                              Verify
+                              Review
                             </button>
                           )}
                           <button
@@ -1086,6 +1141,159 @@ export const AdminDashboard = () => {
           fetchData();
         }}
       />
+
+      {/* ── Review Modal (Verify / Reject) ── */}
+      {isReviewModalOpen && reviewReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-slate-900 text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900">Review Waste Report</h3>
+                  <p className="text-[11px] text-slate-500">Inspect the report, then verify or reject it</p>
+                </div>
+              </div>
+              <button
+                onClick={closeReviewModal}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Report Details */}
+            <div className="p-6 space-y-5">
+              {/* Image + Basic Info */}
+              <div className="flex items-start space-x-4">
+                {reviewReport.imageUrl && (
+                  <img
+                    src={reviewReport.imageUrl.startsWith("http") ? reviewReport.imageUrl : `${API_URL}${reviewReport.imageUrl}`}
+                    alt="Report evidence"
+                    className="w-28 h-28 rounded-xl object-cover border border-slate-200 shrink-0"
+                  />
+                )}
+                <div className="flex-1 space-y-2 text-xs">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-black text-slate-900 text-sm">#{reviewReport.id.substring(0, 6)}</span>
+                    <span className="font-bold px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-full text-[10px]">
+                      {reviewReport.category}
+                    </span>
+                    <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] border ${
+                      reviewReport.priority === "Critical" ? "bg-red-50 text-red-700 border-red-200" :
+                      reviewReport.priority === "High" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                      "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}>
+                      {reviewReport.priority || "Medium"} Priority
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-slate-600">
+                    <p className="flex items-center space-x-1.5">
+                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="line-clamp-1">{reviewReport.address || "Geo-tagged location"}</span>
+                    </p>
+                    <p><span className="text-slate-400">Reporter:</span> <span className="font-bold text-slate-800">{reviewReport.reporterName || "Citizen"}</span></p>
+                    <p><span className="text-slate-400">Submitted:</span> <span className="font-mono">{reviewReport.createdAt ? new Date(reviewReport.createdAt).toLocaleDateString() : "—"}</span></p>
+                    <p><span className="text-slate-400">Status:</span> <span className="font-bold text-slate-800">{reviewReport.status}</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              {reviewReport.description && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 leading-relaxed">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Citizen's Description</span>
+                  {reviewReport.description}
+                </div>
+              )}
+
+              {/* AI Confidence */}
+              {reviewReport.aiConfidence && (
+                <div className="flex items-center space-x-2 text-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-slate-600">AI Classification Confidence:</span>
+                  <span className="font-bold text-emerald-700">{Math.round(reviewReport.aiConfidence * 100)}%</span>
+                </div>
+              )}
+
+              {/* ── Choose Action ── */}
+              <div className="space-y-3 pt-1 border-t border-slate-100">
+                <p className="text-xs font-bold text-slate-700">Choose an action:</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setReviewAction("verify")}
+                    className={`py-3 px-4 rounded-xl border-2 font-bold text-xs transition-all cursor-pointer ${
+                      reviewAction === "verify"
+                        ? "bg-emerald-600 border-emerald-600 text-white shadow-sm"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-emerald-400 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4 mx-auto mb-1" />
+                    Verify Report
+                    <p className="text-[10px] font-normal mt-0.5 opacity-80">+5 points awarded to citizen</p>
+                  </button>
+                  <button
+                    onClick={() => setReviewAction("reject")}
+                    className={`py-3 px-4 rounded-xl border-2 font-bold text-xs transition-all cursor-pointer ${
+                      reviewAction === "reject"
+                        ? "bg-red-600 border-red-600 text-white shadow-sm"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-red-400 hover:bg-red-50"
+                    }`}
+                  >
+                    <AlertTriangle className="w-4 h-4 mx-auto mb-1" />
+                    Reject Report
+                    <p className="text-[10px] font-normal mt-0.5 opacity-80">Mark as invalid or duplicate</p>
+                  </button>
+                </div>
+
+                {/* Rejection reason (shown only when reject selected) */}
+                {reviewAction === "reject" && (
+                  <div className="animate-fade-in">
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Rejection Reason <span className="text-slate-400 font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      rows={2}
+                      placeholder="e.g. Image does not show waste, location is invalid, duplicate report..."
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-red-500 resize-none"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 pb-5 flex items-center justify-between">
+              <button
+                onClick={closeReviewModal}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReviewSubmit}
+                disabled={!reviewAction || submittingAction}
+                className={`px-5 py-2.5 text-xs font-bold rounded-xl text-white shadow-xs cursor-pointer disabled:opacity-40 transition-all ${
+                  reviewAction === "reject" ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+              >
+                {submittingAction
+                  ? "Processing..."
+                  : reviewAction === "reject"
+                  ? "Confirm Rejection"
+                  : reviewAction === "verify"
+                  ? "Confirm Verification"
+                  : "Select an Action"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
