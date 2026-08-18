@@ -64,7 +64,7 @@ router.post("/redeem", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid product selected" });
     }
 
-    const userDocRef = db.collection("users").doc(req.user.id);
+    const userDocRef = db.collection("citizens").doc(req.user.id);
     const userDoc = await userDocRef.get();
 
     if (!userDoc.exists) {
@@ -121,7 +121,7 @@ router.post("/redeem", authenticateToken, async (req, res) => {
 // 3. Get User's Redemption History
 router.get("/history", authenticateToken, async (req, res) => {
   try {
-    const userDoc = await db.collection("users").doc(req.user.id).get();
+    const userDoc = await db.collection("citizens").doc(req.user.id).get();
     if (!userDoc.exists) {
       return res.status(404).json({ error: "User not found" });
     }

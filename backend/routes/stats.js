@@ -20,7 +20,13 @@ router.get("/dashboard", async (req, res) => {
     const timeRange = req.query.range || "30d"; // today, 7d, 30d, 90d, all
 
     const reportsSnapshot = await db.collection("reports").get();
-    const usersSnapshot = await db.collection("users").get();
+    
+    // Query all role collections and merge
+    const [citizensSnap, adminsSnap, workersSnap] = await Promise.all([
+      db.collection("citizens").get(),
+      db.collection("admins").get(),
+      db.collection("workers").get()
+    ]);
     
     let logsSnapshot = { empty: true, forEach: () => {} };
     try {
@@ -35,8 +41,10 @@ router.get("/dashboard", async (req, res) => {
     });
 
     const allUsers = [];
-    usersSnapshot.forEach((doc) => {
-      allUsers.push({ id: doc.id, ...doc.data() });
+    [citizensSnap, adminsSnap, workersSnap].forEach(snap => {
+      snap.forEach((doc) => {
+        allUsers.push({ id: doc.id, ...doc.data() });
+      });
     });
 
     const allLogs = [];

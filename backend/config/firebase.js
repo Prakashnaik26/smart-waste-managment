@@ -39,7 +39,7 @@ function setupMockDb() {
 
   // Ensure db.json exists
   if (!fs.existsSync(mockDbPath)) {
-    fs.writeFileSync(mockDbPath, JSON.stringify({ users: {}, reports: {} }, null, 2));
+    fs.writeFileSync(mockDbPath, JSON.stringify({ citizens: {}, admins: {}, workers: {}, reports: {}, notifications: {}, logs: {}, redemptions: {} }, null, 2));
   }
 
   // Load and save helper
@@ -47,7 +47,7 @@ function setupMockDb() {
     try {
       return JSON.parse(fs.readFileSync(mockDbPath, "utf8"));
     } catch (e) {
-      return { users: {}, reports: {} };
+      return { citizens: {}, admins: {}, workers: {}, reports: {} };
     }
   };
 
@@ -155,4 +155,15 @@ function setupMockDb() {
   };
 }
 
-module.exports = { db, isMock };
+/**
+ * Maps a user role string to its Firestore collection name.
+ * Use this everywhere instead of hard-coding "users".
+ */
+function getUserCollection(role) {
+  if (role === "citizen") return "citizens";
+  if (role === "admin") return "admins";
+  if (role === "worker") return "workers";
+  return "citizens"; // safe default
+}
+
+module.exports = { db, isMock, getUserCollection };

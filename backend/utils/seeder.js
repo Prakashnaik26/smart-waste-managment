@@ -53,9 +53,9 @@ function getJitteredCoords(lat, lng, radiusKm = 3) {
 
 async function seedDatabase() {
   try {
-    // 1. Check if database already has users
-    const usersSnapshot = await db.collection("users").get();
-    if (!usersSnapshot.empty) {
+    // 1. Check if database already has users (check citizens collection)
+    const citizensSnapshot = await db.collection("citizens").get();
+    if (!citizensSnapshot.empty) {
       console.log("📂 Database already seeded. Skipping seeder...");
       return;
     }
@@ -123,11 +123,13 @@ async function seedDatabase() {
       }
     };
 
-    // Save users in Firestore
+    // Save users in their role-specific collections
     for (const key of Object.keys(users)) {
-      await db.collection("users").doc(key).set(users[key]);
+      const userData = users[key];
+      const col = userData.role === "admin" ? "admins" : userData.role === "worker" ? "workers" : "citizens";
+      await db.collection(col).doc(key).set(userData);
     }
-    console.log("👥 Successfully seeded users (including workers).");
+    console.log("👥 Successfully seeded users into role-based collections.");
 
     // 3. Create ~16 mock reports
     const reportCategories = ["Plastic", "Organic", "E-Waste", "Metal", "Mixed"];
@@ -149,7 +151,7 @@ async function seedDatabase() {
       const { lat, lng } = getJitteredCoords(CENTER_LAT, CENTER_LNG, 4);
 
       // Determine statuses and assignments
-      let status = "Not Assigned";
+      let status = "Submitted";
       let assignedWorkerId = "";
       let assignedWorkerName = "";
       let completionPhotoUrl = "";
@@ -159,8 +161,9 @@ async function seedDatabase() {
       createdAt.setDate(createdAt.getDate() - dateOffsetDays);
 
       const statusHistory = [{
-        status: "Not Assigned",
-        timestamp: createdAt.toISOString()
+        status: "Submitted",
+        timestamp: createdAt.toISOString(),
+        note: "Report created by citizen"
       }];
 
       if (i <= 4) {

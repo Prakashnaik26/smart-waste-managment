@@ -28,11 +28,11 @@ export const Login = () => {
       if (isLoginTab) {
         const user = await login(email, password);
         if (user.role === "admin") {
-          navigate("/admin");
+          navigate("/admin", { replace: true });
         } else if (user.role === "worker") {
-          navigate("/worker");
+          navigate("/worker", { replace: true });
         } else {
-          navigate("/");
+          navigate("/", { replace: true });
         }
       } else {
         if (!name.trim()) {
@@ -42,11 +42,11 @@ export const Login = () => {
         }
         const user = await signup(name, email, password, role, phone, []);
         if (user.role === "admin") {
-          navigate("/admin");
+          navigate("/admin", { replace: true });
         } else if (user.role === "worker") {
-          navigate("/worker");
+          navigate("/worker", { replace: true });
         } else {
-          navigate("/");
+          navigate("/", { replace: true });
         }
       }
     } catch (err) {
@@ -149,7 +149,7 @@ export const Login = () => {
                   : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
-              Register New Citizen
+              Create Account
             </button>
           </div>
 

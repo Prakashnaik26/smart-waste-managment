@@ -42,11 +42,12 @@ function getDistanceInMeters(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Helper to update user points and add transaction audit item
+ * Helper to update citizen points and add transaction audit item.
+ * Points are ONLY awarded to citizens.
  */
 async function awardUserPoints(userId, amount, reason) {
   if (!userId || amount === 0) return 0;
-  const userDocRef = db.collection("users").doc(userId);
+  const userDocRef = db.collection("citizens").doc(userId);
   const userDoc = await userDocRef.get();
 
   const now = new Date().toISOString();
@@ -398,17 +399,8 @@ router.patch("/:id/status", authenticateToken, upload.single("completionPhoto"),
 
     if (assignedWorkerId !== undefined) {
       updateData.assignedWorkerId = assignedWorkerId;
-
-      if (assignedWorkerId) {
-        const workerRef = db.collection("users").doc(assignedWorkerId);
-        const workerDoc = await workerRef.get();
-        if (workerDoc.exists) {
-          const wData = workerDoc.data();
-          await workerRef.update({
-            tasksAssigned: (wData.tasksAssigned || 0) + 1
-          });
-        }
-      }
+      // Note: tasksAssigned increment is handled by POST /:id/assign only
+      // to avoid double-counting when both endpoints are used together.
     }
 
     if (assignedWorkerName !== undefined) {
@@ -493,7 +485,7 @@ router.post("/:id/assign", authenticateToken, requireRole("admin"), async (req, 
       statusHistory: history
     });
 
-    const workerRef = db.collection("users").doc(workerId);
+    const workerRef = db.collection("workers").doc(workerId);
     const workerDoc = await workerRef.get();
     if (workerDoc.exists) {
       const wData = workerDoc.data();
